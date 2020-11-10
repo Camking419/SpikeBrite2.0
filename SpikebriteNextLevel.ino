@@ -1,9 +1,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <Wire.h>
 #include <Adafruit_LIS3DH.h>
-//#include <Adafruit_Sensor.h>
 
-
+// Squared bit values to eliminate square root calculation
 #define GRAVITY_SQUARED_BITS_HIGH 324806901
 #define GRAVITY_SQUARED_BITS_LOW  217432719
 #define TWO_TENTH_G_OFFSET        2684354
@@ -16,6 +15,7 @@
 #define LED_COUNT      20
 #define LED_BRIGHTNESS 50 // 0-255
 
+// Sensor and LED Initialization
 Adafruit_LIS3DH acc = Adafruit_LIS3DH();
 Adafruit_NeoPixel led_strip(LED_COUNT, LED_PIN, NEO_GRB /*+ NEO_KHZ800*/);
 
@@ -42,6 +42,7 @@ typedef struct acc_data
 } acc_data;
 acc_data stored_data; 
 
+// LED Animation ENUM
 typedef enum{
   Circle_Fill,         // 0
   Fade_Switch,         // 1
@@ -80,7 +81,7 @@ void setup() {
 
    Serial.println("LIS3DH test!");
 
-  if (! acc.begin(0x18)) {   // change this to 0x19 for alternative i2c address
+  if (! acc.begin(0x18)) {   
     Serial.println("Couldnt start");
     while (1) yield();
   }
@@ -109,7 +110,9 @@ void loop() {
 }
 
 
-  
+/*
+ *  Reads accelerometer and decides whether to calibrate rest value or change LED color if a ball hit is detected
+ */
 void Poll_ACC_Movement(){
   acc.read();
   magnitude_squared = (int32_t(acc.x) * int32_t(acc.x)) + (int32_t(acc.y) * int32_t(acc.y)) + (int32_t(acc.z) * int32_t(acc.z));
@@ -119,7 +122,7 @@ void Poll_ACC_Movement(){
     movement_settled = 1;
   }
  else{
-  // checks clock and flag in case the acceleration is only gravity when changing direction
+  // The accelerometer should not be read again immediately after a hit because the rim could still be moving and register multiple hits
   if(!movement_settled || ((count_clk - last_hit_clk) < 10)  ){ 
      return;   
   }
@@ -135,6 +138,11 @@ void Poll_ACC_Movement(){
  }  
 }
 
+/*
+ * Function is used as a calibration step. The player will hit the ball at the net in a typical way to set an upper limit for a normal hit.
+ * If hits are detected below this upper limit then a legal hit is recorded, but if the hit is above the limit then it is likely an illegal rim hit 
+ * magnitude -  the squared magnitude of an accelerometer reading
+ */
 void Calibrate_Normal_Hit(int32_t magnitude){
     if(magnitude > stored_data.normal_hit_magnitude_squared){
        stored_data.normal_hit_magnitude_squared = magnitude;
